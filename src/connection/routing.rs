@@ -1,86 +1,62 @@
-use crate::{INDEX_TEMPLATE, NOT_FOUND_TEMPLATE};
+use super::{Route, CSS, FAVICON, HTML, NOT_FOUND_STATUS, OK_STATUS};
+use crate::{include_static, render_template, INDEX_TEMPLATE, NOT_FOUND_TEMPLATE};
 use askama::Template;
 
-const OK_STATUS: &str = "200 OK";
-const NOT_FOUND_STATUS: &str = "404 NOT FOUND";
-
-const JAVASCRIPT_MIME_TYPE: &str = concat!("200 OK", "\r\nContent-Type:", "text/javascript");
-const CSS_MIME_TYPE: &str = concat!("200 OK", "\r\nContent-Type: ", "text/css");
-const FAVICON_MIME_TYPE: &str = concat!("200 OK", "\r\nContent-Type: ", "image/x-icon");
-
-macro_rules! render_template {
-    ($template:expr) => {
-        $template.render().expect("get valid html").into_bytes()
-    };
+fn http_request_line(status: &str, mime_type: &str, content_length: usize) -> String {
+    format!("{status}\r\n{mime_type}\r\nContent-Length:{content_length}\r\n\r\n",)
 }
 
-macro_rules! include_static {
-    ($file:expr) => {
-        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/", $file)).to_vec()
-    };
+fn not_found_template() -> Route {
+    let content = render_template!(NOT_FOUND_TEMPLATE);
+    let http_request_line = http_request_line(NOT_FOUND_STATUS, HTML, content.len());
+
+    Route {
+        http_request_line,
+        content,
+    }
 }
 
 macro_rules! define_route {
     ($($name:ident $method:ident $path:literal)+) => {
-        #[derive(Clone, Copy)]
         enum Routes {
             $($name,)+
         }
 
-        const ROUTES: &[(Routes, &str)] = &[
-            $((
-                Routes::$name,
-                concat!(stringify!($method), " ", $path, " HTTP/1.1\r\n"),
-            ),)+
-        ];
+        fn current_route(tcp: &[u8]) -> Option<Routes> {
+            //                   GET /style.css HTTP/1.1\r\n
+            $(if tcp.starts_with(concat!(stringify!($method), " ", $path, " HTTP/1.1\r\n").as_bytes()) {
+                Some(Routes::$name)
+            } else)+ {
+                None
+            }
+        }
     };
 }
 
 define_route! {
-    Index      GET  "/"
-    Htmx       GET  "/htmx.min.js"
-    Favicon    GET  "/favicon.ico"
-    Stylesheet GET  "/style.css"
+    Index       GET  "/"
+    Favicon     GET  "/favicon.ico"
+    Stylesheet  GET  "/style.css"
 }
 
-trait GetRoute {
-    fn current_route(&self) -> Option<Routes>;
-}
-impl GetRoute for &[u8] {
-    fn current_route(&self) -> Option<Routes> {
-        for (name, http_request_line) in ROUTES {
-            if self.starts_with(http_request_line.as_bytes()) {
-                return Some(*name);
-            }
-        }
-
-        None
-    }
-}
-
-pub struct Route<'a> {
-    pub status: &'a str,
-    pub content: Vec<u8>,
-}
-
-pub fn get_route<'a>(tcp: &[u8]) -> Route<'a> {
-    let route = match tcp.current_route() {
+pub fn get_route(tcp: &[u8]) -> Route {
+    let route = match current_route(tcp) {
         Some(route) => route,
-
         None => {
-            return Route {
-                status: NOT_FOUND_STATUS,
-                content: render_template!(NOT_FOUND_TEMPLATE),
-            };
+            return not_found_template();
         }
     };
 
-    let (status, content) = match route {
-        Routes::Index => (OK_STATUS, render_template!(INDEX_TEMPLATE)),
-        Routes::Htmx => (JAVASCRIPT_MIME_TYPE, include_static!("htmx.min.js")),
-        Routes::Favicon => (FAVICON_MIME_TYPE, include_static!("favicon.ico")),
-        Routes::Stylesheet => (CSS_MIME_TYPE, include_static!("style.css")),
+    let (mime_type, content) = match route {
+        Routes::Index => (HTML, render_template!(INDEX_TEMPLATE)),
+        Routes::Favicon => (FAVICON, include_static!("favicon.ico")),
+        Routes::Stylesheet => (CSS, include_static!("style.css")),
     };
 
-    Route { status, content }
+    let http_request_line = http_request_line(OK_STATUS, mime_type, content.len());
+
+    Route {
+        http_request_line,
+        content,
+    }
 }

@@ -1,5 +1,3 @@
-#![feature(const_trait_impl)]
-
 use askama::Template;
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 
