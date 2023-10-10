@@ -5,23 +5,13 @@
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <title>{{ title }}</title>
 
-        <script src="/htmx.min.js"></script>
         <link rel="icon" href="/favicon.ico" />
         <link rel="stylesheet" href="/style.css" />
     </head>
     <body>
-        <header>
-            <img src="/favicon.ico" alt="icon" />
-
-            <button
-                hx-get="/api/shutdown"
-                hx-confirm="Are you sure you that want to quit?">
-                X
-            </button>
-        </header>
         <main>
             <h1>{{ text }}</h1>
-            {% include "repeat-key.html" %}
+            <p>Example text</p>
         </main>
     </body>
 </html>
