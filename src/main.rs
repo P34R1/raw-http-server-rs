@@ -29,8 +29,8 @@ struct IndexTemplate<'a> {
 struct NotFoundTemplate;
 
 const INDEX_TEMPLATE: IndexTemplate = IndexTemplate {
-    title: "Anti Afk",
-    text: "Anti Afk Utility!",
+    title: "Raw HTTP server",
+    text: "Hello World!",
 };
 
 const NOT_FOUND_TEMPLATE: NotFoundTemplate = NotFoundTemplate;
